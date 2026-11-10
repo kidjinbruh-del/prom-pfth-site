@@ -1,0 +1,3 @@
+# Public mirror. The canonical site is https://prom.pfth.ru/
+User-agent: *
+Disallow: /
