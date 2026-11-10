@@ -33,6 +33,18 @@
 html{ scroll-behavior:smooth; scroll-padding-top: calc(var(--hdr-h) + 16px); -webkit-text-size-adjust:100%; overflow-x:clip; }
 @media (prefers-reduced-motion: reduce){ html{ scroll-behavior:auto; } *{ animation:none !important; transition:none !important; } }
 
+/* Мягкая смена документа там, где переход всё же перезагружает страницу
+   (например, политика обработки данных). В остальных случаях меню
+   прокручивает лендинг без перезагрузки. */
+@view-transition{ navigation:auto; }
+::view-transition-old(root){ animation:ptVTout .16s ease both; }
+::view-transition-new(root){ animation:ptVTin .22s ease both; }
+@keyframes ptVTout{ from{ opacity:1 } to{ opacity:0 } }
+@keyframes ptVTin{ from{ opacity:0 } to{ opacity:1 } }
+@media (prefers-reduced-motion: reduce){
+  ::view-transition-old(root), ::view-transition-new(root){ animation:none !important; }
+}
+
 body{
   margin:0;
   background:var(--bg);
@@ -114,6 +126,8 @@ button,input,textarea{ font:inherit; color:inherit; }
 .nav a:hover{ color:var(--text); }
 .nav a::after{ content:""; position:absolute; left:0; bottom:0; width:0; height:1px; background:var(--accent); transition:width var(--tr); }
 .nav a:hover::after{ width:100%; }
+.nav a.is-active{ color:var(--text); }
+.nav a.is-active::after{ width:100%; }
 
 .hdr__act{ display:flex; align-items:center; gap:14px; flex-shrink:0; }
 .hdr__tel{ font-family:var(--mono); font-size:14px; font-weight:600; white-space:nowrap; transition:color var(--tr); }
@@ -997,6 +1011,7 @@ button,input,textarea{ font:inherit; color:inherit; }
   }
   .nav.is-open{ transform:translateY(0); }
   .nav a{ padding:15px 0; border-bottom:1px solid var(--line); font-size:16px; color:var(--text); }
+  .nav a.is-active{ color:var(--accent); }
   .nav a::after{ display:none; }
   .burger{ display:flex; }
   .hdr__act .btn{ display:none; }

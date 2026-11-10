@@ -171,7 +171,11 @@
   }
   trackVisit();
 
-  /* ─────────── ЧИСТЫЕ URL БЕЗ # (/zayavka вместо #zayavka) ─────────── */
+  /* ─────────── ПЕРЕХОДЫ ПО САЙТУ БЕЗ ПЕРЕЗАГРУЗКИ ───────────
+     Все содержательные страницы — копии одного лендинга. Пункты меню
+     не перезагружают документ: меняем адрес в строке браузера и плавно
+     прокручиваем к нужному блоку. Прямой заход на /uslugi.html и
+     перезагрузка работают как раньше — см. initialRoute(). */
   var SECTION_IDS = {
     problema: 1, uslugi: 1, process: 1, baza: 1, oborudovanie: 1, keysy: 1,
     zakazchiki: 1, faq: 1, kontakty: 1, zayavka: 1, sravnenie: 1, ekspertiza: 1,
@@ -179,17 +183,33 @@
     modernizaciya: 1, avtomatizaciya: 1, main: 1
   };
 
+  // index.html и корень — верх страницы, остальным нужно имя блока.
+  function pageFromPath(pathname) {
+    var file = (pathname || '').split('/').pop().toLowerCase();
+    if (!file || file === 'index.html') return 'index';
+    var base = file.replace(/\.html?$/, '');
+    return SECTION_IDS[base] ? base : '';
+  }
+
   function pathSection() {
-    var p = (location.pathname || '/').replace(/^\/+|\/+$/g, '');
-    if (!p) return '';
-    var file = p.split('/').pop();
-    // Каждая страница архива — полная копия с собственным canonical.
-    // При прямом открытии /uslugi.html прокручиваем к блоку «Услуги».
-    if (/\.html?$/i.test(file)) {
-      var base = file.replace(/\.html?$/i, '');
-      return base !== 'index' && SECTION_IDS[base] ? base : '';
-    }
-    return SECTION_IDS[p] ? p : '';
+    var page = pageFromPath(location.pathname);
+    return page === 'index' ? '' : page;
+  }
+
+  // Внутренняя ссылка на блок лендинга? Возвращает id блока и полный URL.
+  function internalTarget(a) {
+    if (!a || a.target === '_blank') return null;
+    var href = a.getAttribute('href') || '';
+    if (!href || href.charAt(0) === '#') return null;
+    var url;
+    try { url = new URL(a.href, location.href); } catch (e) { return null; }
+    if (url.origin !== location.origin) return null;
+    if (!/\.html?$/i.test(url.pathname)) return null;
+    var base = url.pathname.split('/').pop().replace(/\.html?$/i, '').toLowerCase();
+    if (base === 'privacy') return null;              // отдельный документ
+    if (base === 'index' || base === '') return { id: '', url: url };
+    if (!SECTION_IDS[base]) return null;
+    return { id: base, url: url };
   }
 
   function scrollToSection(id, behavior) {
@@ -208,42 +228,49 @@
     }
   }
 
-  // Старые ссылки с # → /путь
+  /* Подсветка пункта меню: видно, в каком блоке находится человек. */
+  var navLinks = $$('#nav a');
+
+  function setActiveNav(id) {
+    navLinks.forEach(function (a) {
+      var target = internalTarget(a);
+      var on = !!(target && target.id === id);
+      a.classList.toggle('is-active', on);
+      if (on) a.setAttribute('aria-current', 'page');
+      else a.removeAttribute('aria-current');
+    });
+  }
+
+  // Старые ссылки с # → адрес .html, чтобы перезагрузка не давала 404.
   if (location.hash && location.hash.length > 1) {
-    var hashId = location.hash.slice(1);
+    var hashId = decodeURIComponent(location.hash.slice(1));
     if (SECTION_IDS[hashId] || hashId === 'hero') {
-      var clean = hashId === 'hero' ? '/' : '/' + hashId;
-      history.replaceState(null, '', clean + location.search);
+      var clean = hashId === 'hero' ? 'index.html' : hashId + '.html';
+      history.replaceState(null, '', new URL(clean + location.search, location.href).href);
     }
   }
 
   function applyRoute(behavior) {
     var id = pathSection();
-    if (id) scrollToSection(id, behavior);
-    else if (location.pathname === '/' || location.pathname === '') {
-      /* home */
-    }
+    scrollToSection(id, behavior);
+    setActiveNav(id);
   }
 
   document.addEventListener('click', function (e) {
     var a = e.target.closest('a[href]');
     if (!a) return;
-    var href = a.getAttribute('href') || '';
-    if (!href.startsWith('/') || href.startsWith('//')) return;
-    if (a.target === '_blank' || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
 
-    var path = href.split('?')[0].split('#')[0];
-    if (path === '/') {
-      e.preventDefault();
-      history.pushState(null, '', '/' + location.search);
-      scrollToSection('', 'smooth');
-      return;
-    }
-    var id = path.replace(/^\//, '').replace(/\/$/, '');
-    if (!SECTION_IDS[id]) return;
+    var target = internalTarget(a);
+    if (!target) return;
+
     e.preventDefault();
-    history.pushState(null, '', '/' + id + location.search);
-    scrollToSection(id, 'smooth');
+    history.pushState(null, '', target.url.href);
+    scrollToSection(target.id, 'smooth');
+    setActiveNav(target.id);
+
+    if (nav) nav.classList.remove('is-open');
+    if (burger) burger.setAttribute('aria-expanded', 'false');
   });
 
   window.addEventListener('popstate', function () { applyRoute('smooth'); });
@@ -258,6 +285,8 @@
       if (window.pageYOffset < 200) scrollToSection(id, 'auto');
     });
   })();
+
+  setActiveNav(pathSection());
 
   // Контекст CTA переживает переход на страницу заявки.
   function restoreFormContext() {
@@ -294,6 +323,25 @@
         nav.classList.remove('is-open');
         burger.setAttribute('aria-expanded', 'false');
       }
+    });
+  }
+
+  /* Текущий пункт меню по мере прокрутки: подсветка переезжает вместе
+     с человеком, а не только по клику. */
+  if (navLinks.length && 'IntersectionObserver' in window) {
+    var navById = {};
+    navLinks.forEach(function (a) {
+      var target = internalTarget(a);
+      if (target && target.id) navById[target.id] = a;
+    });
+    var navObs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting && navById[en.target.id]) setActiveNav(en.target.id);
+      });
+    }, { rootMargin: '-45% 0px -50% 0px', threshold: 0 });
+    Object.keys(navById).forEach(function (id) {
+      var section = document.getElementById(id);
+      if (section) navObs.observe(section);
     });
   }
 

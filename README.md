@@ -1,6 +1,7 @@
 # prom-pfth-site
 
 Публичная копия сайта ПРОФТЕХ для GitHub Pages.
-Исходный репозиторий приватный. Канонический адрес: https://prom.pfth.ru/
 
-?????????: 10.11.2026.
+Адрес: https://kidjinbruh-del.github.io/prom-pfth-site/
+Канонический сайт: https://prom.pfth.ru/
+Исходный репозиторий приватный.
